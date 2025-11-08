@@ -16,7 +16,7 @@ A full-stack Learning Management System built using **Next.js**, **MongoDB**, an
 
 ## ⚙️ Setup Instructions
 ```bash
-git clone https://github.com/yourusername/lms-project.git
+git clone https://github.com/Abhi-7-github/Next_JS.git
 cd lms-project
 npm install
 npm run dev
