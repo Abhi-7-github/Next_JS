@@ -16,6 +16,13 @@ const users = [
     name: "consumer",
     role: "consumer",
   },
+  {
+    id: "3",
+    email: "student@example.com",
+    password: "studentpass",
+    name: "student",
+    role: "student",
+  },
 ];
 
 const handler = NextAuth({
