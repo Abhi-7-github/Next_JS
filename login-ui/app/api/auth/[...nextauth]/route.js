@@ -1,31 +1,10 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import connectToDatabase from "@/utils/mongodb";
+import User from "@/models/User";
+import bcrypt from "bcryptjs";
 
-const users = [
-  {
-    id: "1",
-    email: "admin@example.com",
-    password: "adminpass",
-    name: "admin",
-    role: "admin",
-  },
-  {
-    id: "2",
-    email: "consumer@example.com",
-    password: "consumerpass",
-    name: "consumer",
-    role: "consumer",
-  },
-  {
-    id: "3",
-    email: "student@example.com",
-    password: "studentpass",
-    name: "student",
-    role: "student",
-  },
-];
-
-const handler = NextAuth({
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -38,24 +17,45 @@ const handler = NextAuth({
           throw new Error("Email and password are required");
         }
 
-        const user = users.find(
-          (u) =>
-            u.email === credentials.email &&
-            u.password === credentials.password
-        );
-
-        if (!user) {
-          throw new Error("Invalid credentials");
+        try {
+          await connectToDatabase();
+        } catch (err) {
+          console.error("MongoDB connection error:", err);
+          throw new Error("Database connection failed");
         }
 
-        return user;
+        const user = await User.findOne({ email: credentials.email.toLowerCase() }).lean();
+        if (!user) {
+          console.log("Login failed for email:", credentials.email, "- Invalid credentials");
+          return null;
+        }
+
+        const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isPasswordValid) {
+          console.log("Login failed for email:", credentials.email, "- Invalid password");
+          return null;
+        }
+
+        console.log("Login successful for user:", {
+          id: user._id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          timestamp: new Date().toISOString(),
+        });
+
+        return {
+          id: user._id.toString(),
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        };
       },
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   callbacks: {
-    // Store role info in token
     async jwt({ token, user }) {
       if (user) {
         token.name = user.name;
@@ -63,11 +63,11 @@ const handler = NextAuth({
       }
       return token;
     },
-    // Map token data to session
     async session({ session, token }) {
       if (session.user) {
         session.user.name = token.name;
         session.user.role = token.role;
+        session.user.id = token.sub;
       }
       return session;
     },
@@ -75,6 +75,8 @@ const handler = NextAuth({
   pages: {
     signIn: "/signin",
   },
-});
+};
+
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };

@@ -1,11 +1,114 @@
-export default function SignUpPlaceholder() {
+"use client";
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import toast from 'react-hot-toast';
+import Navbar from '../../components/layout/navbar';
+import InputField from '../../components/global/input-field';
+import Button from '../../components/global/button';
+
+const SignupPage = () => {
+  const [form, setForm] = useState({ email: '', password: '', name: '', role: 'student' });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setError('');
+    setSuccess('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!form.email || !form.password || !form.name || !form.role) {
+      toast.error('All fields are required.');
+      return;
+    }
+
+    setIsLoading(true);
+    const loadingToast = toast.loading('Creating your account...', { duration: Infinity });
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.dismiss(loadingToast);
+        toast.error(data.error || 'Registration failed. Please try again.');
+        return;
+      }
+      toast.dismiss(loadingToast);
+      const loginToast = toast.loading('Registration successful! Logging you in...', { duration: Infinity });
+
+      await new Promise((res) => setTimeout(res, 500));
+
+      const signInResponse = await signIn('credentials', {
+        redirect: false,
+        email: form.email,
+        password: form.password,
+      });
+
+      if (signInResponse?.ok) {
+        toast.dismiss(loginToast);
+        toast.success(`Welcome ${form.name}! Redirecting to your dashboard...`);
+        const target = form.role === 'admin' ? '/admin-dashboard' : '/student-dashboard';
+        router.push(target);
+      } else {
+        toast.dismiss(loginToast);
+        toast.error('Registration succeeded, but automatic login failed. Please sign in manually.');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.dismiss();
+      toast.error('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="bg-white p-8 rounded shadow-md border border-gray-200 max-w-md w-full text-center">
-        <h1 className="text-2xl font-bold mb-4 text-black">Sign Up</h1>
-        <p className="text-sm text-gray-600 mb-4">Registration is not implemented yet.</p>
-        <p className="text-xs text-gray-400">(Placeholder page)</p>
+    <>
+      <Navbar />
+      <div className="max-w-md mx-auto mt-16">
+        <form onSubmit={handleSubmit} className="bg-white p-8 rounded shadow-md border border-gray-200">
+          <h2 className="text-2xl text-black font-bold mb-6 text-center">Sign Up</h2>
+
+          {error && <div className="mb-4 text-red-600 text-center text-sm" role="alert">{error}</div>}
+          {success && <div className="mb-4 text-green-600 text-center text-sm" role="alert">{success}</div>}
+
+          <InputField label="Full Name" name="name" type="text" value={form.name} onChange={handleChange} placeholder="Enter your full name" disabled={isLoading} required />
+
+          <InputField label="Email" name="email" type="email" value={form.email} onChange={handleChange} placeholder="Enter your email" disabled={isLoading} required />
+
+          <InputField label="Password" name="password" type="password" value={form.password} onChange={handleChange} placeholder="Enter your password (min 6 characters)" disabled={isLoading} required />
+
+          <div className="mb-6">
+            <label htmlFor="role" className="block text-gray-700 mb-2">Role</label>
+            <select id="role" name="role" value={form.role} onChange={handleChange} className="w-full px-3 py-2 text-black border rounded focus:outline-none focus:ring focus:border-blue-300 disabled:opacity-50" disabled={isLoading} required>
+              <option value="student">Student</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <Button type="submit" disabled={isLoading}>{isLoading ? 'Creating Account...' : 'Sign Up'}</Button>
+
+          <div className="mt-4 text-center text-sm text-gray-600">Already have an account?{' '}
+            <button type="button" onClick={() => router.push('/signin')} className="text-blue-600 hover:text-blue-800 underline">Sign In</button>
+          </div>
+        </form>
       </div>
-    </div>
+    </>
   );
-}
+};
+
+export default SignupPage;
+
